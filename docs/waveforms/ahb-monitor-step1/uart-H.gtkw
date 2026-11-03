@@ -1,0 +1,38 @@
+[*] A-only Passive AHB Monitor: existing waveform, 1 ps timescale
+[dumpfile] "/home/tingniu94/cvw/docs/waveforms/ahb-monitor-step1/ahb-only.vcd"
+[savefile] "/home/tingniu94/cvw/docs/waveforms/ahb-monitor-step1/uart-H.gtkw"
+[timestart] 5280
+[size] 1500 850
+[pos] -1 -1
+*0.000000 5310 5070 5150 5220 5230 5240 5310 5320 5330 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 240
+[signals_width] 220
+[sst_expanded] 0
+@28
+testbench.dut.HCLK
+@28
+testbench.dut.HRESETn
+@28
+testbench.dut.HREADY
+@28
+testbench.dut.HRESP
+@28
+testbench.dut.HTRANS[1:0]
+@22
+testbench.dut.HADDR[55:0]
+@28
+testbench.dut.HWRITE
+@22
+testbench.dut.HSIZE[2:0]
+@22
+testbench.dut.HBURST[2:0]
+@22
+testbench.dut.HPROT[3:0]
+@28
+testbench.dut.HMASTLOCK
+@22
+testbench.dut.HWDATA[63:0]
+@22
+testbench.dut.HWSTRB[7:0]
+@22
+testbench.dut.HRDATA[63:0]

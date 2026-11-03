@@ -84,6 +84,17 @@ module wallypipelinedsoc import cvw::*; #(parameter cvw_t P)  (
     .HWRITE, .HSIZE, .HBURST, .HPROT, .HTRANS, .HMASTLOCK, .ExternalStall
    );
 
+  // Passive observation only: the core and uncore retain their original AHB wiring.
+  if (P.BUS_SUPPORTED) begin : monitorgen
+    ahb_monitor #(
+      .ADDR_WIDTH(P.PA_BITS), .DATA_WIDTH(P.AHBW), .STRB_WIDTH(P.XLEN/8)
+    ) monitor (
+      .HCLK, .HRESETn, .HADDR, .HWDATA, .HWSTRB, .HWRITE,
+      .HSIZE, .HBURST, .HPROT, .HTRANS, .HMASTLOCK,
+      .HRDATA, .HREADY, .HRESP
+    );
+  end
+
   // instantiate uncore if a bus interface exists
   if (P.BUS_SUPPORTED) begin : uncoregen // Hack to work around Verilator bug https://github.com/verilator/verilator/issues/4769
     uncore #(P) uncore(.HCLK, .HRESETn, .TIMECLK,

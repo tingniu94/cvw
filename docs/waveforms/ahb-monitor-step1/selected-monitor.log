@@ -1,0 +1,10 @@
+[AHB_MON] beat=193 addr_cycle=484 done_cycle=485 waits=0 write=0 addr=00000080000200 trans=10 size=3 burst=5 prot=2 lock=0 rdata=644260e2450152e0 resp=0
+[AHB_MON] beat=194 addr_cycle=485 done_cycle=486 waits=0 write=0 addr=00000080000208 trans=11 size=3 burst=5 prot=2 lock=0 rdata=80826105690264a2 resp=0
+[AHB_MON] beat=195 addr_cycle=486 done_cycle=487 waits=0 write=0 addr=00000080000210 trans=11 size=3 burst=5 prot=2 lock=0 rdata=619c00a78023619c resp=0
+[AHB_MON] beat=196 addr_cycle=487 done_cycle=488 waits=0 write=0 addr=00000080000218 trans=11 size=3 burst=5 prot=2 lock=0 rdata=07b78082e19c0785 resp=0
+[AHB_MON] beat=197 addr_cycle=488 done_cycle=489 waits=0 write=0 addr=00000080000220 trans=11 size=3 burst=5 prot=2 lock=0 rdata=00e781a3470d1000 resp=0
+[AHB_MON] beat=198 addr_cycle=489 done_cycle=490 waits=0 write=0 addr=00000080000228 trans=11 size=3 burst=5 prot=2 lock=0 rdata=0715100007378082 resp=0
+[AHB_MON] beat=199 addr_cycle=490 done_cycle=491 waits=0 write=0 addr=00000080000230 trans=11 size=3 burst=5 prot=2 lock=0 rdata=0207f79300074783 resp=0
+[AHB_MON] beat=200 addr_cycle=491 done_cycle=492 waits=0 write=0 addr=00000080000238 trans=11 size=3 burst=5 prot=2 lock=0 rdata=8023100007b7dfe5 resp=0
+[AHB_MON] beat=201 addr_cycle=499 done_cycle=501 waits=1 write=0 addr=00000010000005 trans=10 size=0 burst=0 prot=3 lock=0 rdata=6060606060606060 resp=0
+H[AHB_MON] beat=202 addr_cycle=508 done_cycle=510 waits=1 write=1 addr=00000010000000 trans=10 size=0 burst=0 prot=3 lock=0 wdata=4848484848484848 strb=01 resp=0
