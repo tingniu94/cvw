@@ -1,0 +1,59 @@
+[*] Step 2 A-only Shared Guard: upstream/downstream signal pairs
+[dumpfile] "/home/tingniu94/cvw/artifacts/ahb-shared-guard-step2/run-001/unit/shared_guard.vcd"
+[savefile] "/home/tingniu94/cvw/docs/waveforms/ahb-shared-guard-step2/unit-burst-stall.gtkw"
+[timestart] 150
+[size] 1500 1000
+*0.000000 185 165 185 195 205 215 225 275 305 315 325 335 385 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 240
+[signals_width] 240
+@28
+shared_guard_tb.HCLK
+shared_guard_tb.HRESETn
+@22
+shared_guard_tb.A_HADDR[55:0]
+@22
+shared_guard_tb.HADDR[55:0]
+@28
+shared_guard_tb.A_HTRANS[1:0]
+@28
+shared_guard_tb.HTRANS[1:0]
+@28
+shared_guard_tb.A_HWRITE
+@28
+shared_guard_tb.HWRITE
+@22
+shared_guard_tb.A_HSIZE[2:0]
+@22
+shared_guard_tb.HSIZE[2:0]
+@22
+shared_guard_tb.A_HBURST[2:0]
+@22
+shared_guard_tb.HBURST[2:0]
+@22
+shared_guard_tb.A_HPROT[3:0]
+@22
+shared_guard_tb.HPROT[3:0]
+@28
+shared_guard_tb.A_HMASTLOCK
+@28
+shared_guard_tb.HMASTLOCK
+@22
+shared_guard_tb.A_HWDATA[63:0]
+@22
+shared_guard_tb.HWDATA[63:0]
+@22
+shared_guard_tb.A_HWSTRB[7:0]
+@22
+shared_guard_tb.HWSTRB[7:0]
+@22
+shared_guard_tb.HRDATA[63:0]
+@22
+shared_guard_tb.A_HRDATA[63:0]
+@28
+shared_guard_tb.HREADY
+@28
+shared_guard_tb.A_HREADY
+@28
+shared_guard_tb.HRESP
+@28
+shared_guard_tb.A_HRESP

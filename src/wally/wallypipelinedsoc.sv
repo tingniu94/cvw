@@ -77,14 +77,43 @@ module wallypipelinedsoc import cvw::*; #(parameter cvw_t P)  (
   // synchronize reset to SOC clock domain
   synchronizer resetsync(.clk, .d(reset_ext), .q(reset));
 
+  // Core A's original AHB interface, upstream of the shared guard.
+  logic [P.PA_BITS-1:0]       A_HADDR;
+  logic [P.AHBW-1:0]          A_HWDATA, A_HRDATA;
+  logic [P.XLEN/8-1:0]        A_HWSTRB;
+  logic                       A_HWRITE, A_HMASTLOCK, A_HREADY, A_HRESP;
+  logic [2:0]                 A_HSIZE, A_HBURST;
+  logic [3:0]                 A_HPROT;
+  logic [1:0]                 A_HTRANS;
+
   // instantiate processor and internal memories
   wallypipelinedcore #(P) core(.clk, .reset,
     .MTimerInt, .MExtInt, .SExtInt, .MSwInt, .MTIME_CLINT,
-    .HRDATA, .HREADY, .HRESP, .HCLK, .HRESETn, .HADDR, .HWDATA, .HWSTRB,
-    .HWRITE, .HSIZE, .HBURST, .HPROT, .HTRANS, .HMASTLOCK, .ExternalStall
+    .HRDATA(A_HRDATA), .HREADY(A_HREADY), .HRESP(A_HRESP), .HCLK, .HRESETn,
+    .HADDR(A_HADDR), .HWDATA(A_HWDATA), .HWSTRB(A_HWSTRB),
+    .HWRITE(A_HWRITE), .HSIZE(A_HSIZE), .HBURST(A_HBURST),
+    .HPROT(A_HPROT), .HTRANS(A_HTRANS), .HMASTLOCK(A_HMASTLOCK), .ExternalStall
    );
 
-  // Passive observation only: the core and uncore retain their original AHB wiring.
+  if (P.BUS_SUPPORTED) begin : sharedguardgen
+    ahb_shared_guard #(
+      .ADDR_WIDTH(P.PA_BITS), .DATA_WIDTH(P.AHBW), .STRB_WIDTH(P.XLEN/8)
+    ) shared_guard (
+      .HCLK, .HRESETn,
+      .A_HADDR, .A_HWDATA, .A_HWSTRB, .A_HWRITE, .A_HSIZE, .A_HBURST,
+      .A_HPROT, .A_HTRANS, .A_HMASTLOCK, .A_HRDATA, .A_HREADY, .A_HRESP,
+      .HADDR, .HWDATA, .HWSTRB, .HWRITE, .HSIZE, .HBURST,
+      .HPROT, .HTRANS, .HMASTLOCK, .HRDATA, .HREADY, .HRESP
+    );
+  end else begin : nosharedguardgen
+    // Match the original core's no-bus outputs and connect its responses.
+    assign {HADDR, HWDATA, HWSTRB, HWRITE, HSIZE, HBURST,
+            HPROT, HTRANS, HMASTLOCK} = {A_HADDR, A_HWDATA, A_HWSTRB,
+            A_HWRITE, A_HSIZE, A_HBURST, A_HPROT, A_HTRANS, A_HMASTLOCK};
+    assign {A_HRDATA, A_HREADY, A_HRESP} = {HRDATA, HREADY, HRESP};
+  end
+
+  // Passive observation only: monitor the shared guard's downstream bus.
   if (P.BUS_SUPPORTED) begin : monitorgen
     ahb_monitor #(
       .ADDR_WIDTH(P.PA_BITS), .DATA_WIDTH(P.AHBW), .STRB_WIDTH(P.XLEN/8)
