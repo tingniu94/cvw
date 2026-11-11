@@ -1,0 +1,54 @@
+[*] Step 3D integration, run-002, 1ps; header-validated
+[dumpfile] "/home/tingniu94/cvw/artifacts/ahb-lockstep-step3d/run-002/integration/compare-ingress.vcd"
+[timestart] 0
+[size] 1500 1000
+[sst_width] 250
+[signals_width] 280
+@28
+compare_ingress_tb.comparator.HCLK
+@28
+compare_ingress_tb.comparator.HRESETn
+@28
+compare_ingress_tb.comparator.pair_valid
+@28
+compare_ingress_tb.comparator.pair_ready
+@28
+compare_ingress_tb.comparator.match_valid
+@28
+compare_ingress_tb.comparator.match_ready
+@28
+compare_ingress_tb.comparator.fault_valid
+@22
+compare_ingress_tb.comparator.fault_reason[10:0]
+@22
+compare_ingress_tb.comparator.result_seq[2:0]
+@22
+compare_ingress_tb.comparator.pair_seq[2:0]
+@22
+compare_ingress_tb.comparator.saved_a_seq[2:0]
+@22
+compare_ingress_tb.comparator.saved_b_seq[2:0]
+@22
+compare_ingress_tb.comparator.saved_a_addr[55:0]
+@22
+compare_ingress_tb.comparator.saved_b_addr[55:0]
+@22
+compare_ingress_tb.comparator.saved_a_wdata[63:0]
+@22
+compare_ingress_tb.comparator.saved_b_wdata[63:0]
+@22
+compare_ingress_tb.comparator.saved_a_wstrb[7:0]
+@22
+compare_ingress_tb.comparator.saved_b_wstrb[7:0]
+@28
+compare_ingress_tb.dut.A_HREADY
+@28
+compare_ingress_tb.dut.B_HREADY
+@28
+compare_ingress_tb.dut.A_req_valid
+@28
+compare_ingress_tb.dut.B_req_valid
+@28
+compare_ingress_tb.dut.A_rsp_valid
+@28
+compare_ingress_tb.dut.B_rsp_valid

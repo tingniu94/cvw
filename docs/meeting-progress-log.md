@@ -111,3 +111,37 @@ Evidence：`artifacts/ahb-lockstep-step3c/run-002/summary.json`、alignment-buil
 Meeting可報告：雙Ingress可在A/B skew與backpressure下形成正確有序pair；peer wait/backpressure已拆開且有directed實測；原Ingress/controller regression無退步。限制：只有synthetic AHB與test completion，無第二Core、Comparator/Gate、Uncore side effect、timeout/fault policy、真正Response Distribution。32-bit只lint；Verilator二態，不宣稱Formal/STA。Response仍需共同reset flush，任意延遲的stale response不在當前能力內。
 
 下一步：Step3D保存並比較pair payload，match前禁止issue；Step3E處理單份Response保存、pair identity、雙側恰好一次消耗與共同reset。詳細技術與介面契約見新Step3C文件。目前請求範圍無未解決測試錯誤。
+
+## 2026-11-11 — Step 3D Saved-Payload Comparator
+
+**完成並驗證PASS**。起點/最終branch `ahb-lockstep-step3`、HEAD `55ed74182345d855fc02c284d0a9ec794e7de91a`。沒有commit/push、CPU/Uncore/Step2Guard/Step3B/C/Performance功能修改。
+
+Step0證據：重播舊Step3C CSV，1145ps兩側接受、1155ps pair handoff；舊VCD顯示1160ps共同reset，1165ps是ledger reset sampling edge。該pair尚未response所以各取消1筆。每側18handoffs=17complete+1posthandoff取消；20accept=17complete+3cancel，另2筆在handoff前取消，最終pending0。分析保存run-001/step3c-accounting.json與run-002/step3c-reset-waveform.json，無交易遺失，不修改Counter定義。
+
+Architecture：新增一筆registered Comparator result slot，從既有pair_valid/ready接收兩份完整saved payload。pair_ready只依EMPTY credit，不依match；接收後registered MATCH或sticky FAULT。MATCH經match_valid&&match_ready正常交付一次；Fault有獨立fault_valid/reason/A/B snapshots，正常valid永遠0，until common reset。原ingress停WAIT_RESPONSE，不假裝Core已收到成功或Error。真正Output Gate/Uncore master/Response Distribution留Step3E。
+
+比較：addr/write/size/burst/prot/trans/lock完整equality；兩側皆Write才比完整data/strobe，strobe0的data仍比較。Read忽略write lanes，HRDATA/HRESP不在request介面。先檢查A/B local_seq=pair_seq與valid beat；不具同ordinal或IDLE/BUSY不進payload比較而fault。11-bit reason mask可同時記錄多項差異。
+
+實際主命令：
+
+```bash
+python3 tests/ahb_lockstep/run_compare.py artifacts/ahb-lockstep-step3d/run-002
+python3 -m py_compile tests/ahb_lockstep/run_compare.py tests/ahb_lockstep/summarize_compare.py
+git diff --check
+```
+
+Verilator5.036，--binary --trace --timing --assert --timescale1ps/1ps，clock10ps；ccache需sandbox外寫入，runner核准升權執行。run-001另保存兩個零warning lint與preflight。完整argv/cwd/exitcode、width matrix與source snapshot都在artifacts；沒有異常build/simulation failure或warning suppression。
+
+Unit實測：56/64/8/32有216cases/7MATCH/209fault；34/32/4/32有158/7/151；32/32/4/8有108/7/101。共482cases、21normal dispatch、461fault零normal dispatch。每width另有1個pending MATCH reset取消，總485accept=21dispatch+461fault+3reset-cancel。全address/data/strobe/seq/size/burst/prot bits皆注入；direction/lock/transfer、Read忽略write lanes、重複地址、multiple reasons、backpressure stable、sticky fault拒收新pair/reset recovery皆PASS。Python以完整saved snapshots重新算mask並重播handshake，不只看success字串。
+
+Integration：原雙ingress+join直接接新Comparator，測Aearly3、Bearly2、同到、Write/backpressure4、重複地址、不同順序heads、reset recovery。8handoff/7normal dispatch，兩側各8accept/7complete/1cancel；fault request沒有normal dispatch、response或completion。Response僅由test stub在成功dispatch後產生，不宣稱功能Response Distribution。
+
+原Step3C regression18pairs、每側20accept/17complete/3cancel一致；nested原Step3B unit/controller/cache tests全部PASS。所有build/runtime/離線核對零Warning，git diff --check PASS。
+
+Problems & Solutions：handoff與completion分開計數的reset差異已證實；為防Mismatch握手無診斷卡死，改用fault接收與成功dispatch分流的安全設計，不改舊interface。Read/Write語意分支避免誤報，完整bit sweep排除高位截斷。No drain/refill bypass，fault不自動清除/重試。沒有需重大架構變更的不相容。
+
+Evidence：`artifacts/ahb-lockstep-step3d/run-002/summary.json`、各width build/simulation logs和runtime compare-cases.csv/compare-events.csv/compare.vcd；integration events/cases/VCD；step3c-regression及nested step3b-regression；source-sha256與command/result JSON。技術文件 `docs/ahb-dual-core-step3d.md` 詳列equations、mask、timing。GTKWave comparator/integration設定已對照VCD header，未產生GUI截圖。關鍵窗口：RV64 addr mismatch385–465ps、highest-data-bit12265–12345ps；integration Write255–345ps、fault455–525ps、reset recovery535–575ps。
+
+變更：新增Comparator RTL、兩個TB、runner/summarizer、新技術文件與兩份waveform設定；本meeting log只追加。7010個既有檔案先建立hash，最終允許本log追加且驗舊prefix，其餘7009不變。config.ini既有修改及untracked backups/artifacts保留，沒有Git設定修改或stash/reset/clean。
+
+Meeting可報告：Saved-Payload Comparator與fail-closed fault已完成、461 faults零成功交付、三種width有實際runtime、舊3B/C無退步。限制：只到matched internal request界面，沒有真實MMIO/Uncore Output Gate或AHB Error Distribution、完整Burst policy、四態注入/Formal/STA。下一步Step3E整合唯一downstream transaction FSM與response identity/雙側consumed/error/reset收尾。當前scope無未解決錯誤。

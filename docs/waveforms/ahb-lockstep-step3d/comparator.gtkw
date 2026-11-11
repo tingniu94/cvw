@@ -1,0 +1,42 @@
+[*] Step 3D comparator, run-002, 1ps; header-validated
+[dumpfile] "/home/tingniu94/cvw/artifacts/ahb-lockstep-step3d/run-002/rv64/compare.vcd"
+[timestart] 0
+[size] 1500 1000
+[sst_width] 250
+[signals_width] 280
+@28
+compare_tb.dut.HCLK
+@28
+compare_tb.dut.HRESETn
+@28
+compare_tb.dut.pair_valid
+@28
+compare_tb.dut.pair_ready
+@28
+compare_tb.dut.match_valid
+@28
+compare_tb.dut.match_ready
+@28
+compare_tb.dut.fault_valid
+@22
+compare_tb.dut.fault_reason[10:0]
+@22
+compare_tb.dut.result_seq[31:0]
+@22
+compare_tb.dut.pair_seq[31:0]
+@22
+compare_tb.dut.saved_a_seq[31:0]
+@22
+compare_tb.dut.saved_b_seq[31:0]
+@22
+compare_tb.dut.saved_a_addr[55:0]
+@22
+compare_tb.dut.saved_b_addr[55:0]
+@22
+compare_tb.dut.saved_a_wdata[63:0]
+@22
+compare_tb.dut.saved_b_wdata[63:0]
+@22
+compare_tb.dut.saved_a_wstrb[7:0]
+@22
+compare_tb.dut.saved_b_wstrb[7:0]
