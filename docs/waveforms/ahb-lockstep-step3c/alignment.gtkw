@@ -1,0 +1,74 @@
+[*] Step 3C synthetic dual ingress + ordered join; run-002; 1ps
+[dumpfile] "/home/tingniu94/cvw/artifacts/ahb-lockstep-step3c/run-002/unit/alignment.vcd"
+[timestart] 125
+[size] 1500 1000
+[sst_width] 250
+[signals_width] 270
+@28
+alignment_tb.dut.HCLK
+@28
+alignment_tb.dut.HRESETn
+@28
+alignment_tb.dut.A_HREADY
+@28
+alignment_tb.dut.B_HREADY
+@28
+alignment_tb.dut.A_HRESP
+@28
+alignment_tb.dut.B_HRESP
+@28
+alignment_tb.dut.A_pending_valid
+@28
+alignment_tb.dut.B_pending_valid
+@28
+alignment_tb.dut.A_req_valid
+@28
+alignment_tb.dut.B_req_valid
+@28
+alignment_tb.dut.pair_valid
+@28
+alignment_tb.dut.pair_ready
+@28
+alignment_tb.dut.A_rsp_valid
+@28
+alignment_tb.dut.A_rsp_ready
+@28
+alignment_tb.dut.B_rsp_valid
+@28
+alignment_tb.dut.B_rsp_ready
+@22
+alignment_tb.dut.A_HADDR[55:0]
+@22
+alignment_tb.dut.B_HADDR[55:0]
+@22
+alignment_tb.dut.A_HTRANS[1:0]
+@22
+alignment_tb.dut.B_HTRANS[1:0]
+@22
+alignment_tb.dut.pair_seq[2:0]
+@22
+alignment_tb.dut.pair_a_seq[2:0]
+@22
+alignment_tb.dut.pair_b_seq[2:0]
+@22
+alignment_tb.dut.pair_a_addr[55:0]
+@22
+alignment_tb.dut.pair_b_addr[55:0]
+@22
+alignment_tb.dut.pair_a_wdata[63:0]
+@22
+alignment_tb.dut.pair_b_wdata[63:0]
+@22
+alignment_tb.dut.pair_a_wstrb[7:0]
+@22
+alignment_tb.dut.pair_b_wstrb[7:0]
+@22
+alignment_tb.dut.pairing_wait_cycles[63:0]
+@22
+alignment_tb.dut.a_peer_wait_cycles[63:0]
+@22
+alignment_tb.dut.b_peer_wait_cycles[63:0]
+@22
+alignment_tb.dut.pair_backpressure_cycles[63:0]
+@22
+alignment_tb.dut.paired_requests[63:0]

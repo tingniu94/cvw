@@ -77,3 +77,37 @@ Key evidence: run-004 unit logs/JSON/VCD; run-005/{original,step2}/build.log, si
 Git review: changed testbench integration; added monitor/unit/three Python tools/two docs. instrumentation-working.diff includes new untracked code so review does not require a commit. Config hash remains865a6f85b2dc335a82bbc2e306bebd3e2050f04d757cbe5f86f2694f3e45a777. git diff --check PASS.
 
 Meeting summary: Phase1 boundary coverage closed, Phase2 fair baseline complete, zero measured overhead for A-only combinational Guard on Hello/rv64gc. Results do not imply physical frequency/area/power or Step3 dual-core performance. No remaining failure in requested scope. Future work: additional workloads/configurations and eventual dual-core integration; these are not claimed complete or required for this baseline.
+
+## 2026-11-11 — Step 3C Dual Ingress + Request Alignment
+
+**完成並驗證 PASS**。本次起點 HEAD `782dbddeee15fdbcd19f898a21302f9edddb5dc9`、branch `ahb-lockstep-step3`；未 commit/push。原 Performance Baseline（Original vs Step2 Hello cycle overhead0%）保留，不重跑、不延伸為 Step3C overhead結論。
+
+Architecture：先核對 Step3A/3B文件、原 ingress RTL、現有 unit/controller測試、performance文件與meeting歷史。Step3B實際每側只有1個pending slot；Read進OFFER，Write下一拍CAPTURE_DATA後才OFFER；req/rsp handshake分離、response沒有epoch/tag。可安全用兩個原樣Ingress加原子ready/valid join延伸，不需要修改CPU/EBU/Guard或Ingress。
+
+新增 `ahb_lockstep_dual_ingress.sv`、`ahb_lockstep_pair.sv`。pair_valid表示兩側完整OFFER，pair_ready只表示consumer credit，不是match/allow。兩側同緣dispatch，兩份saved payload/seq原樣交Step3D；本階段不比較payload，不搜尋相同地址，不合併重複地址。沒有Shared Uncore輸出。兩側獨立response接線只供測試stub／未來Step3E，沒有功能性Response Distribution。
+
+Counter：pre-edge A_req_valid XOR B_req_valid 計 peer wait；分A/B。兩側都valid但pair_ready0只計pair_backpressure。Common reset清零，counter不觸發timeout或issue。Read/Read和Write/Write同到都計0；同到Read/Write有1拍data-capture availability差，不是payload mismatch。沿用既有AHB雙相位與Performance ROI定義。
+
+Directed results：125 cycles、244 counter checks、18 pairs；A/B各accept20、complete17、reset_cancel3，無pending／重複／錯序。18中1對dispatch後reset取消，其餘17對完成；各側另2筆dispatch前取消。Simultaneous Read0、Write0、Aearly1→1、Aearly4→4、Bearly3→3、Write skew2→2；both-valid backpressure5時peer wait0；skew3+backpressure4則分別3與4。測試還涵蓋不同payload照樣handoff、3-bit seq wrap、重複相同地址、A先完成並接受n+1但B仍等n時不錯配，以及四種reset與EMPTY stray response/IDLE/BUSY。
+
+舊 Step3B regression：原unit46cycles、accepted9/dispatched8/completed7/cancelled2；single controller2次完成；cache controller8次完成與cache_ack1。全部build/runtime PASS，32-bit lint PASS，零Warning。原Step3B檔案未修改。
+
+實際主命令：
+
+```bash
+python3 tests/ahb_lockstep/run_alignment.py artifacts/ahb-lockstep-step3c/run-002
+python3 -m py_compile tests/ahb_lockstep/run_alignment.py tests/ahb_lockstep/summarize_alignment.py
+git diff --check
+```
+
+Verilator5.036，--binary --trace --timing --assert --timescale1ps/1ps，clock10ps。每個build/lint/simulation/regression/verifier的argv/cwd/exitcode保存於run-002的command/result JSON。初次run-001 ccache遇sandbox唯讀，核准相同命令升權後成功；原log保留。完整最終runner用新run-002，不覆蓋舊證據。
+
+Problems & Solutions：以完整req_valid而非pending_valid辨認Write Data尚未完成；採用原slot持有payload避免新增FIFO或半pair消耗。Testbench首次simulation前靜態校閱發現async counter reset先於reference edge flush，改為reset解除時比較pre-edge、reset edge後比較全零；不修改RTL語意。無測試simulation失敗、無warning suppression。未發現需大幅修改既有架構的不相容。
+
+Evidence：`artifacts/ahb-lockstep-step3c/run-002/summary.json`、alignment-build.log、alignment-simulation.log、verification.log；unit/alignment.vcd、alignment-cycles.csv、pairing-cases.csv；step3b-regression/summary.json與原unit/controller logs/VCD。Waveform windows包括Aearly4 125–195ps、Bearly3 205–265ps、backpressure 465–545ps、asymmetric response 895–995ps、reset 1005–1175ps；GTKWave設定 `docs/waveforms/ahb-lockstep-step3c/alignment.gtkw` 已核對VCD header，未產生GUI截圖。
+
+變更：新增兩個RTL、alignment_tb、runner/summarizer、`docs/ahb-dual-core-step3c.md`、waveform設定；本meeting log只追加。6946個原source/tests/docs/backups/evidence先核對全數hash未變；追加後另檢查舊meeting log前綴不變，其餘舊檔維持hash一致。最終Git diff/status與來源snapshot另保存。config.ini原修改、未追蹤guard/backups與所有舊artifacts保留。
+
+Meeting可報告：雙Ingress可在A/B skew與backpressure下形成正確有序pair；peer wait/backpressure已拆開且有directed實測；原Ingress/controller regression無退步。限制：只有synthetic AHB與test completion，無第二Core、Comparator/Gate、Uncore side effect、timeout/fault policy、真正Response Distribution。32-bit只lint；Verilator二態，不宣稱Formal/STA。Response仍需共同reset flush，任意延遲的stale response不在當前能力內。
+
+下一步：Step3D保存並比較pair payload，match前禁止issue；Step3E處理單份Response保存、pair identity、雙側恰好一次消耗與共同reset。詳細技術與介面契約見新Step3C文件。目前請求範圍無未解決測試錯誤。
