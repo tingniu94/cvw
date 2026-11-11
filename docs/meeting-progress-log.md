@@ -145,3 +145,43 @@ Evidence：`artifacts/ahb-lockstep-step3d/run-002/summary.json`、各width build
 變更：新增Comparator RTL、兩個TB、runner/summarizer、新技術文件與兩份waveform設定；本meeting log只追加。7010個既有檔案先建立hash，最終允許本log追加且驗舊prefix，其餘7009不變。config.ini既有修改及untracked backups/artifacts保留，沒有Git設定修改或stash/reset/clean。
 
 Meeting可報告：Saved-Payload Comparator與fail-closed fault已完成、461 faults零成功交付、三種width有實際runtime、舊3B/C無退步。限制：只到matched internal request界面，沒有真實MMIO/Uncore Output Gate或AHB Error Distribution、完整Burst policy、四態注入/Formal/STA。下一步Step3E整合唯一downstream transaction FSM與response identity/雙側consumed/error/reset收尾。當前scope無未解決錯誤。
+
+## 2026-11-11 — Step 3E SINGLE Output Gate + Response Distribution
+
+**SINGLE/NONSEQ版本完成並驗證PASS**，不是完整Burst/SEQ支援。起點/最終Branch `ahb-lockstep-step3`、HEAD `effe1a897de3c6e13dc10fd84c8a00c915f4951f`。沒有commit/push或雙Core/SoC整合，原3B/C/D與Performance定義不改。
+
+Preflight核對實際Ingress one-slot/OFFER/WAIT_RESPONSE、pair原子handoff、Comparator registered MATCH/fault、原AHB/APB bridge的Data phase資料需求。metadata在單一outstanding、共同reset flush下足夠，不需修改原介面。Burst只有metadata無context，故matched Burst/SEQ/Lock不降級、不發有效地址，以sticky policy fault拒絕。未宣稱INCR8執行PASS。
+
+Architecture：新ahb_lockstep_guard.sv串接原3B/C/D與新ahb_lockstep_output.sv。Backend保存owner payload/seq，EMPTY→ADDRESS→DATA→RESPONSE→RELEASE；fault後HALTED。Registered MATCH＋supported才authorized；HREADY接受Address一次後轉DATA，下一Address為IDLE，saved Write Data/Strobe保持，不用live A/B。合法MATCH在bus原先HREADY0時保持Comparator backpressure，避免在stalled IDLE改輸出；unsupported可以不碰bus而fault-receive。
+
+Response：只在自己Data phase完成保存HRDATA/HRESP。Atomic ready barrier等兩側Ingress WAIT_RESPONSE都ready才同拍capture一次，buffer到兩側AHB completion前仍有owner。Normal internal capture後下一edge完成；Error由原Ingress重建兩周期ready0/resp1、ready1/resp1。Downstream error sticky fault不阻擋該筆error replay，只禁止之後normal dispatch。Error release同緣next Address保存為quarantine，等待reset。
+
+Fault/reset：mismatch或unsupported沒有downstream acceptance、side effect或假response；兩側停等共同reset。Downstream Error正常回兩側error後HALT；原EBU忽略HRESP，不宣稱trap或恢復。Reset flush全路徑；若slave已完成寫入，prefix效果保留，不rollback。測試在down完成後reset response buffer再讀RAM，驗證prefix仍在。無tag介面仍要求slave共同reset，任意晚到舊response未支援。
+
+實際命令：
+
+```bash
+python3 tests/ahb_lockstep/run_guard.py artifacts/ahb-lockstep-step3e/run-002
+python3 -m py_compile tests/ahb_lockstep/run_guard.py tests/ahb_lockstep/summarize_guard.py
+git diff --check
+```
+
+run-001保存preflight hash及零Warning lint。Verilator5.036、--binary --trace --timing --assert --timescale1ps/1ps、clock10ps。Runner用新不存在目錄，所有argv/cwd/exitcode/source snapshot/hash保存；ccache需sandbox外寫入，核准升權後執行。沒有build、simulation、assertion或離線verification失敗，沒有warning suppression。
+
+Unit runtime實測：56/64/8有36pairs、27authorized、26down accept/25complete、A/B各23complete、A/B cancel16/15，Read/Write effects10/13，Error2。34/32/4與32/32/4各32pairs、23authorized、22down accept/21complete、A/B各19complete、cancel16/15、effects10/9、Error2。每width有3個mismatch和5個unsupported rejects，全部零downstream交易／假成功。
+
+Counter差異都有reset證據：RV64 36pairs=23完整+8拒絕+5reset；27authorized在ADDRESS取消1→26accept，DATA取消1→25downcomplete，response/release取消2→23upcomplete。24次internal fork中1次fork後、AHB release前被reset，不誤算成功。A39accept=23complete+16cancel、B38=23+15，多1筆A是在pairing時reset僅A已接受。
+
+Latency從pre-edge事件與edge index計算，不修改Performance ROI。Pair首次完整available→authorized、handoff→authorized分別記錄；同edge先舊completion再新accept，reset/reject不混入完整latency平均。Zero-wait Read兩側6cycles、Write7；normal downcomplete→upcomplete2，Error3。Aearly3/datawait2的A/B totals11/8；Bearly2/addresswait2/datawait1為9/11；Write addresswait3/datawait4為14/14。
+
+RV64 23完整pairs的min/mean/max：pair→authorized1/1.130435/4，authorized→downaccept1/1.217391/4，downaccept→complete1/2/5，downcomplete→A/B2/2.086957/3。A端total6/8.130435/14，B端6/8.086957/14。全epochs peer wait8、consumer backpressure3、address stall7、data wait24；其中address2/data1是reset前取消的等待。整合response backpressure0，獨立fork test把單側ready拉低3cycles，兩側均不提前消耗，恢復後各一次。所有數據是Guard Unit latency，**不是CPU overhead**；原Hello Step2 overhead0%不被重寫或延伸。
+
+驗證涵蓋simultaneous/Aearly/Bearly、zero/multiwait、完整data width及所有byte lanes/halfword、readback、高Address bit、upstream oldWrite completion與nextRead Address同edge、IDLE/BUSY、Error replay/quarantine、各種mismatch/policy reject、pairing/MATCH/address/data/response/release reset。Slave byte RAM與獨立shadow ledger比對data/status/effect count；Python獨立重播事件與latencies。原Step3D482cases/461faults、原3C18pairs、原3B unit/controller/cache regression全部PASS，零Warning，git diff --check PASS。
+
+Evidence：`artifacts/ahb-lockstep-step3e/run-002/summary.json`；各width build/simulation logs和runtime guard.vcd、guard-events.csv、transactions/cancelled-upstream JSON、latency.json/latency.csv；fork logs/VCD；step3d-regression與nested3C/3B證據。GTKWave guard/fork設定已核對VCD header，未啟動GUI或截圖。重要窗口35–95ps zero-wait Read，605–745ps Write stalls，1625–1775ps release/next Address，1785–1855ps mismatch，2495–2635ps Error，3045–3115ps已完成prefix後reset。
+
+新增兩個RTL、兩個TB、runner/summarizer、新Step3E文件與兩份waveform設定；既有meeting log只追加。7129個舊檔hash先保存，最終驗7128原檔不變與本log舊prefix完整。tests/riscof/config.ini、未追蹤備份、舊artifacts保留，未修改Git設定或stash/reset/clean。
+
+Problems & Solutions：單owner＋明確Address/Data/RSP/release狀態避免把同個HREADY當兩種完成；預存Write Data避免當前HWRITE0丟資料；response buffer/barrier避免A先消耗或B拿錯response；HREADY0之前的IDLE保持用consumer credit安全延後；Error replay不被sticky fault一起擋掉。無重大interface不相容或非預期驗證錯誤。
+
+Meeting可報告：SINGLE Output Gate與真正A/B response路徑完成、match前零下游交易、所有byte lanes/寬度及fault/error/reset有證據、unit latency與backpressure分類清楚、舊3B/C/D無退步。限制：尚無burst/BUSY scheduler、有效downstream多筆pipeline重疊、實際Uncore/雙Core、四態/Formal/STA；不宣稱rollback或CPU recovery。下一步先補burst context與實際Uncore wrapper驗證，再考慮受控SoC整合。
