@@ -690,6 +690,25 @@ module testbench;
     .HTRANS, .HMASTLOCK, .HREADY, .TIMECLK(1'b0), .GPIOIN, .GPIOOUT, .GPIOEN,
     .UARTSin, .UARTSout, .SPIIn, .SPIOut, .SPICS, .SPICLK, .SDCIn, .SDCCmd, .SDCCS, .SDCCLK, .PWMGPIO);
 
+  // PERFORMANCE_BASELINE_BEGIN: passive observer; no functional RTL changes.
+  if (P.ZICSR_SUPPORTED && P.COUNTERS > 2 && P.XLEN == 64) begin : perf
+    performance_monitor #(P.XLEN) monitor(
+      .clk, .reset, .roi_end(CurrState == STATE_RUN_TEST && TestComplete),
+      .retire(dut.core.priv.priv.csr.InstrValidNotFlushedM),
+      .stalls({dut.core.StallW, dut.core.StallM, dut.core.StallE, dut.core.StallD, dut.core.StallF}),
+      .hresetn(HRESETn), .hready(HREADY), .hresp(dut.HRESP),
+      .hwrite(HWRITE), .htrans(HTRANS), .haddr(HADDR), .hburst(HBURST),
+      .hsize(HSIZE), .hprot(HPROT), .hmastlock(HMASTLOCK),
+      .mcycle(dut.core.priv.priv.csr.counters.HPMCOUNTER_REGW[0]),
+      .minstret(dut.core.priv.priv.csr.counters.HPMCOUNTER_REGW[2]),
+      .cycle_inhibit(dut.core.priv.priv.csr.MCOUNTINHIBIT_REGW[0]),
+      .instret_inhibit(dut.core.priv.priv.csr.MCOUNTINHIBIT_REGW[2]),
+      .cycle_write(dut.core.priv.priv.csr.counters.WriteHPMCOUNTERM[0]),
+      .instret_write(dut.core.priv.priv.csr.counters.WriteHPMCOUNTERM[2]),
+      .loaded_memfile(memfilename));
+  end
+  // PERFORMANCE_BASELINE_END
+
   // generate clock to sequence tests
   always begin
     clk = 1'b1; # 5; clk = 1'b0; # 5;
