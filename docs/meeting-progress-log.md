@@ -185,3 +185,95 @@ Evidence：`artifacts/ahb-lockstep-step3e/run-002/summary.json`；各width build
 Problems & Solutions：單owner＋明確Address/Data/RSP/release狀態避免把同個HREADY當兩種完成；預存Write Data避免當前HWRITE0丟資料；response buffer/barrier避免A先消耗或B拿錯response；HREADY0之前的IDLE保持用consumer credit安全延後；Error replay不被sticky fault一起擋掉。無重大interface不相容或非預期驗證錯誤。
 
 Meeting可報告：SINGLE Output Gate與真正A/B response路徑完成、match前零下游交易、所有byte lanes/寬度及fault/error/reset有證據、unit latency與backpressure分類清楚、舊3B/C/D無退步。限制：尚無burst/BUSY scheduler、有效downstream多筆pipeline重疊、實際Uncore/雙Core、四態/Formal/STA；不宣稱rollback或CPU recovery。下一步先補burst context與實際Uncore wrapper驗證，再考慮受控SoC整合。
+
+## Step 3F F1 — Burst Context / Validator（2026-11-23）
+
+沿用HEAD 8b4c9a1ef，依確認方向保留原始INCR8；只新增獨立Validator，不改Output Gate、CPU、Cache、EBU、BURST_EN及既有Performance ROI。實作ahb_lockstep_burst_context.sv；新增burst_context_tb.sv、burst_context_compare_tb.sv、run_burst_context.py及docs/ahb-dual-core-step3f.md。
+
+Architecture：Registered MATCH Saved Payload＋consumer credit→Validation→authorized/rejected；READY→ADDRESS→DATA→READY，Burst Context跨8筆保存。NONSEQ建立、SEQ逐筆地址/HSIZE/HWRITE/HBURST/HPROT驗證，Alignment、1KB及Address Overflow檢查，Lock/未支援Burst保留拒絕。ENABLE_INCR8預設0。down_accept與down_complete獨立，不能用裸HREADY；第8筆Address後仍active、accepted8/completed7/index7，最後Data完成才清active。BUSY/IDLE不建立有效命令、不推進Index；end_burst是未來Scheduler明確事件，不把無Request當過早結束。既有Ingress沒有idle/busy token，F2須建立Adapter，本輪不偷偷擴充Ingress。
+
+Fault為Sticky，compare_fault阻止新授權；已授權的舊Data仍可完成記帳。無Rollback／Recovery／真實Error Distribution。未接入Guard，不宣稱F2或真實雙Core完成。
+
+命令：`python3 tests/ahb_lockstep/run_burst_context.py artifacts/ahb-lockstep-step3f/run-007`；`python3 tests/ahb_lockstep/run_guard.py artifacts/ahb-lockstep-step3f/regression-001`；`git diff --check`。完整argv/cwd/toolchain/hash均保存在各執行目錄。Verilator5.036、--binary --timing --trace-fst --assert --timescale1ps/1ps，Clock10ps，Falling Edge驅動/Rising Edge後#1檢查，無NBA Race。
+
+結果：F1 AW56/DW64 32cases、AW34/DW32 30cases、AW32/DW32 30cases、舊模式10cases、真實Comparator接入1case全部PASS，共103。Read/Write所有合法HSIZE、合法1KB尾端、非法地址/Control/Sequence/Alignment/Burst/Lock、提前結束、Reset、credit、最終Data Pending、錯誤Event Ownership均有Assertions。每個完整Burst Epoch授權/接受/完成各8次。Console accepts/completes為raw刺激含刻意孤立錯誤事件，不拿它當合法transaction總數。真實Comparator將相同非法A/B判MATCH後，Validator仍阻止Boundary違規。Step3E及巢狀3D/3C/3B全部PASS，最終所有Build零Warning。
+
+Problems & Solutions：run-001位寬Warning以正確寬度literal/運算修正；run-002 ccache sandbox寫入失敗以獲准外部Build處理；run-003初版PASS後補強全HSIZE及final beat index。run-004 VCD SIGSEGV，debug-001排除單純Stack上限，debug-002 ASAN定位VerilatedVcd::printStr/emitTimeChange null寫入及Timestamp Flush指標問題；run-005註解被解析為directive；run-006 dumpflush未生成有效呼叫，仍crash；改FST完整Waveform後run-007全PASS，未減少測試／Assertions，未改RTL語意或工具安裝。失敗Log、VCD、ASAN資料完整保留。
+
+Evidence：artifacts/ahb-lockstep-step3f/run-007/summary.json、final-verification.json、各組*-build.log/*-simulation.log、source-snapshot/hash、rv64/rv32/explicit32/legacy的burst-context.fst與compare/compare-validator.fst；regression-001/summary.json及巢狀Regression Logs。技術文件包含State/Timing Table、介面責任、限制、命令及Debug過程。最終Git狀態／新增檔案統計另存final-verification.json；既有config.ini修改與backups/artifacts保留，未Commit/Push。
+
+Meeting可報告：F1合法性與Address/Data分離完成，最終Data Pending不可誤認Burst完成，相同非法雙側資料不能繞過檢查；舊3B～3E無退步。下一步待確認後F2串接保守單Outstanding的INCR8/BUSY Backend，再做完整Controller/Uncore測試；本輪停止，不直接實作F2。
+
+## Step 3F F2 — INCR8 Output Gate / BUSY Scheduler（2026-11-23）
+
+Preflight依序執行git branch --show-current、git status --short、git log --oneline -6，確認ahb-lockstep-step3/8b4c9a1ef。既有F1與Meeting Log未提交、config.ini既有修改、未追蹤Artifacts/Backups保留；原始檔與Hash存f2-preflight-001。
+
+F2最小修改Output/Guard加入ENABLE_INCR8預設0；Burst模式把Registered MATCH交原F1驗證，Backend同拍保存Owner Payload。首NONSEQ、後七SEQ、HBURST5，前七筆後以BUSY/下一Expected Address等Peer/Response/Consumer；第八Address後IDLE但保留Pending Data/Response。HWDATA/HWSTRB來自Owner，不依live A/B；M_HREADY沒有直接廣播上游。SINGLE原路徑保留，F1/Ingress/Pair/Comparator/CPU/Cache/EBU/BURST_EN/ROI不變。
+
+Interface限制在實作前已說明：F1單Outstanding，不支援下游Address Acceptance與舊Data Completion同Edge；以BUSY排程避免重疊，不能把0次下游Overlap報PASS。上游Ingress真實同Edge Completion/Acceptance已測2次，包含最後Burst→SINGLE。end_burst接0，由Scheduler確保僅八Address後IDLE，沒有捏造live IDLE/BUSY Token。
+
+實際命令：run_burst_output.py artifacts/ahb-lockstep-step3f/f2-run-004；summarize_burst_output.py同目錄；run_burst_context.py artifacts/ahb-lockstep-step3f/f2-f1-regression-001；run_guard.py artifacts/ahb-lockstep-step3f/f2-regression-001；git diff --check。完整argv、工具版本、cwd、Exit Code、Source Snapshot/Hash保存。Verilator5.036、F2 FST/Timing/Assert、Clock10ps。
+
+結果：AW/DW/SW56/64/8、34/32/4、32/32/4全部PASS。每組4個完整Burst32beats、4個SINGLE、1筆後續Fault前綴，共37次Auth/Down Accept/Down Complete/A Complete/B Complete；Policy Reject2（Boundary/中途地址），另有Comparator Mismatch及無Peer停等。Zero-wait Read/Write與逐Beat Wait Read/Write、Peer Skew±0～3、BUSY/Byte Lane/Strobe/Readback/Response/最後Pending/Data Owner Stability均有Scoreboard與Assertions。Python獨立按Epoch/Owner重播37個唯一Owner。每組BUSY276、Address Stall31、Data Stall51、Upstream Overlap2、Downstream Overlap0、Beat Latency1～5；BUSY包含Fault等待，非CPU Overhead。
+
+Regression：F1 103案例全部PASS；Step3E/3D/3C/3B全部PASS；最終所有Build Warning0。舊Unsupported政策仍在，沒有刪除檢查或將INCR8變SINGLE。
+
+Problems & Solutions：f2-run-001 ccache sandbox寫入失敗，以獲准外部Build重跑；f2-run-002 RV64 Assertions PASS但Python誤將十進位HBURST當二進位字串，修正解析；f2-run-003三組PASS後補強BUSY Credit及最後Burst Completion/下一SINGLE同Edge測試，最終f2-run-004全部PASS。完整失敗Log保留。沿用FST，不停用Assertions，不使用Warning Suppression。
+
+Evidence：f2-run-004/summary.json、replay-summary.json、final-verification.json，各寬度Build/Simulation Logs及runtime guard-events.csv/events.json/transactions.json/beat-ledger.json/burst-output.fst；f2-f1-regression-001/summary.json、f2-regression-001/summary.json與巢狀Regression。完整架構/FSM/限制記於docs/ahb-dual-core-step3f-f2.md，完整本輪最終Codex回覆與進度訊息另存f2-run-004/codex-response.md及codex-progress.md。
+
+Meeting可報告：受控Synthetic INCR8正常路徑接通、保留NONSEQ/SEQ/HBURST、MATCH+Validation前零有效下游交易、逐Beat守恆與A/B Response一致，既有Regression無退步。限制：下游Pipeline不支援；F3完整Mismatch/Error/Reset/Fault Drain/Recovery待做；沒有Rollback、真實Uncore/雙Core或CPU效能驗證。只完成序列化F2範圍，停止等待確認，不進入F3/3G/Fault Injection。無Commit/Push。
+
+## Step 3F F2b — 架構阻礙確認，停止RTL擴充（2026-11-23）
+
+依序核對branch/status/log，HEAD仍8b4c9a1ef，所有既有未提交/未追蹤資料保留。閱讀F1/Output/Guard/Ingress/Pair/Compare、F1/F2文件及f2-run-004 Owner Ledger後，確認阻礙不只Backend互斥FSM：Ingress單Pending Slot，必須在舊Data Complete→Saved Response→Ingress Capture→上游Complete後才能接受下一Address，之後才有Pair/MATCH。下一合法Saved MATCH不能在舊Data完成前取得。F1放寬事件或Backend加FIFO不會改變這條因果鏈；Writes還受下一Data Phase資料可用性與完整MATCH約束。
+
+依使用者補充的「需大改Ingress/Response契約就停止」條件，本輪沒有改RTL或TB，沒有改F1、沒有製造內部同拍pulse或Backend-only正向測試冒充完整Guard。full_F2_acceptance_complete仍false，F2b實際Downstream Overlap仍0，驗收NOT_MET。
+
+重新執行F1 103cases、F2三組各37完整Owners、Step3B～3E全部PASS，Build/Simulation returncode0，Warning/Error0。Python檢查三組各35條同Epoch相鄰Owner依賴，最短下一Pair比舊Data晚3cycles；FSM各state/HREADY組合互斥。RV64實際115ps Owner0 Data Complete、125ps Rsp Capture、135ps上游Complete、145/165ps下一B/A Address、185ps下一Pair、195ps授權、205ps下一DownAccept，不能稱為同Edge重疊。
+
+BUSY序列化主要影響吞吐量，不因無Overlap就必然破壞AHB；原Controller有HREADY等待支援。但真雙Core/實際Uncore Hello未驗證，不能保證SoC完成。保留現狀風險較小；全路徑Overlap需重新審查Ingress Request取得、Write Data MATCH時點、Response Queue/Owner與跨Burst Context，不保證加Buffer可解決，更不能提前假成功。
+
+Evidence：artifacts/ahb-lockstep-step3f/f2b-run-001/，含Source Snapshot/SHA256、原始preflight/commands、f1/f2/step3e新Regression與巢狀Logs/JSON/FST、architecture-analysis.json、三組causal-ledger、FST匯出VCD及兩張真實波形PNG（非GUI截圖）、Script、summary/final verification、RTL Diff、完整Codex回覆與Evidence ZIP。F2技術文件只追加F2b結果，舊Meeting內容保留。每組Unit數據BUSY276/Address Stall31/Data Stall51/Upstream Overlap2/Downstream Overlap0/Beat Latency1～5，不推論CPU CPI。
+
+Problems & Solutions：無RTL Build/Assertion Failure；本輪失敗的是F2b驗收條件，原因為架構依賴，不以PASS隱藏。無matplotlib，使用現有libcairo將真實FST匯出渲染，不更動環境。Meeting應報告功能回歸穩定、Performance與Protocol正確性區分、完整Payload先MATCH與單Pending架構的因果限制。未進入F3/3G/Fault Injection，未Commit/Push。
+
+## Step 3F — Controller Compatibility Gate（2026-11-23）
+
+目標：以兩個原始ahbcacheinterface/buscachefsm實際生成AHB INCR8，驗證既有序列化Guard，而非人工AHB資料或真Core。Preflight Branch/HEAD仍ahb-lockstep-step3/8b4c9a1ef，保留所有F1/F2未提交內容、config.ini修改及Artifacts/Backups。直接include原rv64gc建立完整P，512-bit Line/64-bit AHB/BURST_EN1，兩組READ_ONLY_CACHE=0/1都測。
+
+新增controller_gate_tb.sv、run_controller_gate.py、summarize_controller_gate.py、render_controller_gate.py及docs/ahb-dual-core-step3f-controller-gate.md。沒有修改任何Guard/CPU/Cache/EBU/Controller功能RTL。Cache端激勵只提供CacheBusRW/Adr/ReadDataWord與Uncached BusRW/WriteDataM；AHB Address/HTRANS/HBURST/HWDATA/HWSTRB全由原RTL輸出。
+
+最終controller-gate-run-004：DCache19cases、106個Pair/Auth/DownAccept/DownComplete/A/B Complete；ICache6cases、42個完整Owner，全部PASS。DCache7個Refill＋5個Writeback，A/B各12 Ack；ICache5個Refill，A/B各5 Ack。獨立Python CSV/FST重播確認24份完整Fetch Buffer快照順序，Writeback40個Cache Word/Strobe正確，另8個SINGLE Byte Store覆蓋全部Lane及最後Readback。同步Zero-wait、A/Bearly、每Beat Address/Data Wait、連續R/R、W/R、R/W、Burst後SINGLE皆PASS，無False Mismatch/Unexpected ERROR/Deadlock。
+
+Data/Address分離：Write在Address接受後原wdreg NBA更新，下一Edge由Ingress保存，即使上游Ready0；Scoreboard驗證資料所屬舊Address。CacheAck必須對應Beat7與A/B最後Completion，下游8筆皆已完成；Ack當拍Fetch Buffer用NBA後FST值核對，避免off-by-one。原Controller生成的連續Burst上游同Edge Completion/新NONSEQ接受：DCache3次、ICache1次；下游Overlap0，不修改F2b full_F2_acceptance_complete=false。
+
+Unit數據：DCache Controller總Edge距離1160、Address Stall180、Data Stall223、BUSY615、PeerWait11、最後DataPending Wait40、Latency1～5；ICache429/69/83/239/5/16/1～5。Pair/Consumer Backpressure本測試0，不假稱非零已覆蓋。ZeroWait單Burst Refill49、Writeback57cycles；Aearly Read89、Bearly Write96、連續R/R168、W/R177、R/W178。非CPU CPI，不修改既有ROI。
+
+本輪重新執行F1 103cases、F2三組37Owners、Step3B～3E全部PASS，保存在controller-gate-regression-001；Final兩組Lint/Build/Simulation全部PASS、Warning/Error0，git diff --check PASS。完整命令argv/cwd/version/exitcode/source hash保留。
+
+Problems & Solutions：run-001 mux路徑錯誤修正為generic/mux.sv；run-002兩個TB fd邏輯AND引發WIDTHTRUNC，改fd!=0，未截斷計數；run-003 ccache sandbox Read-only，獲准外部Build，新run-004兩組首次Simulation即PASS。沒有Guard功能修正。PNG Renderer初版縮排SyntaxError僅修正離線Renderer，無重跑或修改測試結果；使用真FST匯出波形、非GUI截圖。
+
+Evidence：controller-gate-run-004的summary/verification/metrics/beat-ledger/ack-fetch-ledger/events/cases/burst-metrics JSON/CSV、完整Logs、Source Snapshot/SHA256、FST、controller-gate.gtkw、三張PNG、Git Diff、完整Codex回覆與Evidence ZIP。Read末筆495/505/525ps為Address/Data/Ack；Stalled Write末筆2905/2955/2975ps，同樣Ack晚2cycles。
+
+Meeting結論：現有方案A在原始Controller層No-Fault可前進，Read/Write均有完整證據，可以安排下一個EBU Compatibility Gate或F3，但未實作下一階段。限制：尚無原Cache SRAM/FSM/EBU/實際Uncore/雙Core/中途Fault/Error/Reset/Flush；不宣稱Step3G PASS。無Commit/Push，原檔/未追蹤資料保留。
+
+Controller Gate最終補強：run-004通過後，TB僅新增4096 Byte Slave Memory/Shadow逐Byte Assertion及Actual/Expected Dump；最終交付改用controller-gate-run-005，兩組重新Lint/Build/Simulation及獨立FST Replay全部PASS、4096 Byte Dump均一致，原交易數與Latency/Wait統計不變。原run-004保留。原Guard/Controller未修改；Regression仍使用相同未改動的F1/F2/3B～3E來源，結果不變。本輪最終完整Codex回覆、Source Hash、Diff與Evidence ZIP位於run-005。
+
+## Step 3F — EBU Compatibility Gate（2026-11-23）
+
+本輪先核對branch/status/log，仍ahb-lockstep-step3/8b4c9a1ef；保留既有未提交/未追蹤資料與config.ini修改。以兩側各原始ebu/ebufsmarb/controllerinput，搭配四個原ahbcacheinterface/buscachefsm（各側IFU readonly、LSU read/write），接現有Guard與Controlled Slave；只從Cache/Uncached上層輸入激勵，未人工覆寫AHB輸出，未改功能RTL或BURST_EN。
+
+仲裁依Source：同時請求LSU優先，IFUSave保存IFU第一地址，Controller live地址可先進；Restore/Disable直到LSU最後Data的對應HREADY/FinalBeatD條件，才將Saved IFU Address對外接受。Scoreboard分開local Controller與EBU外部accept，按HPROT/Sequence保存Owner；資料始終用舊Data Owner，不用live Select誤判。每側7 Save、527 Restore cycles，所有527 cycles Saved/Live IFU地址不同而保存正確；14個Saved Request各只Forward一次。獨立5312列仲裁樣本核對State/NextState、Select、Disable、Ready gating。
+
+最終ebu-gate-run-005：27cases、236 Pair/Auth/DownAccept/DownComplete/A/B Completion全部PASS，Read171/Write65；IFU12 Refill96beats、LSU9 Refill72beats、7 Writeback56beats、Uncached Read3/Write9。A/B各28 Ack（IFU12/LSU16），42份完整Fetch Buffer快照均MATCH，所有Ack晚於最後Down Data2cycles。同Writeback Line8words讀回、八個Byte Lane同Word讀回0x1032547696b8dcfe、全4096 Byte Dump一致。無False Mismatch/Unexpected Error/Watchdog Timeout。
+
+Cases含同步/近同步IFU/LSU、IFU先/LSU先、Replica A/B偏移、Zero/各Beat Wait、IFU/LSU連續Burst、W→R/R→W、Burst→SINGLE。Skew保留兩側相同上層交易順序；不宣稱任意重排都合法MATCH。Response Barrier同步Capture/Completion236次，非零Consumer BP本Gate沒有發生。
+
+Unit數據：總Edge距離2655、Address Stall423、Data Stall530、BUSY1470、PeerWait8、最後DataPending Wait59、Latency1～5；Pair/Consumer BP0/0、下游Overlap0。保留F2b NOT_MET/full_F2_acceptance_complete=false；不是CPU CPI或整合雙Core Overhead。實際both_read Save2595ps、LSU最後DownData3575ps、Saved IFU Address Forward3595ps，PNG/FST有完整FSM切換。
+
+重新執行ebu-gate-regression-001：F1 103、F2三寬度各37、Step3B～3E及Controller Gate19/6cases、106/42Owners全部PASS。最終Lint/Build/Simulation零Warning/Error，git diff --check PASS。命令、工具版本、cwd、returncode、Source Snapshot/Hash保留。Verilator5.036/Timing/Assert/FST、Clock10ps。
+
+Problems & Solutions：run-001新TB IFUReqDelay階層誤寫，修正為ebufsmarb層；run-002一個WIDTHEXPAND以Operand擴寬修正；run-003 ccache sandbox Read-only改獲准外部Build。run-004 26cases/228首次Sim PASS後補明確Memory Readback，run-005 27cases/236全部PASS；未以改條件掩蓋功能失敗、無Guard/原EBU修正。所有舊Run保留，無Warning Suppression。
+
+新增ebu_gate_tb/run_ebu_gate/summarize_ebu_gate/analyze_ebu_arbitration/render_ebu_gate及docs/ahb-dual-core-step3f-ebu-gate.md；沒有修改Controller Gate原測試。Evidence在ebu-gate-run-005，含Logs/Commands、Events/Arbitration/Owner/Ack/Fetch Ledgers、Memory Dumps、FST、GTKWave、三張真實FST PNG（非GUI截圖）、Hash/Diff、Codex完整回覆與ZIP。Meeting可報告：原EBU仲裁與已測No-Fault序列化Guard相容，可安排F3，仍無真Cache/CPU/Uncore/雙Core/中途Fault/Reset驗證。本輪停止，不進F3/3G/Fault Injection；未Commit/Push。

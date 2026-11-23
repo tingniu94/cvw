@@ -2,7 +2,8 @@
 // Synthetic/standalone Step 3E top, not connected to the SoC.
 module ahb_lockstep_guard #(
   parameter integer ADDR_WIDTH=56,DATA_WIDTH=64,
-  parameter integer STRB_WIDTH=DATA_WIDTH/8,SEQ_WIDTH=32
+  parameter integer STRB_WIDTH=DATA_WIDTH/8,SEQ_WIDTH=32,
+  parameter bit ENABLE_INCR8=0
 )(
   input logic HCLK, HRESETn,
   input logic [ADDR_WIDTH-1:0] A_HADDR,
@@ -175,7 +176,7 @@ module ahb_lockstep_guard #(
     .fault_reason(compare_fault_reason),.result_seq
   );
   ahb_lockstep_output #(.ADDR_WIDTH(ADDR_WIDTH),.DATA_WIDTH(DATA_WIDTH),
-    .STRB_WIDTH(STRB_WIDTH),.SEQ_WIDTH(SEQ_WIDTH)) output_backend(
+    .STRB_WIDTH(STRB_WIDTH),.SEQ_WIDTH(SEQ_WIDTH),.ENABLE_INCR8(ENABLE_INCR8)) output_backend(
     .HCLK,.HRESETn,.inhibit(cmp_fault),.match_valid,.match_ready,.match_seq(result_seq),
     .cmd_addr(saved_a.addr),
     .cmd_write(saved_a.write),
