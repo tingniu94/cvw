@@ -321,3 +321,17 @@ Problems & Solutions：run-001新TB IFUReqDelay階層誤寫，修正為ebufsmarb
 - Regression 全 PASS：F1 103、F2 三寬度各 37、F3a 1008 Mismatch／21 Reset、F3b 432 ERROR／18 Reset、3B～3E、Controller 25 cases／148 transactions、EBU 27 cases／236 transactions。最終 Lint／Build 無 Warning，Ruff py39／py313、Assertions／Diff Check PASS；刻意 Watchdog 的 Fatal 獨立標為預期負向。
 - 證據：`artifacts/ahb-lockstep-step3f/f3c-validation-run-002/`、`f3c-boundary-validation-run-001/`、`f3c-regression-run-001/`；各案例包含 INI、Parsed Config、Injection／Owner／Source／Memory Ledgers、Summary／Log／FST，Binary Cache 以 Source／Tool／Width Hash 驗證。
 - 操作與範例見 `docs/ahb-dual-core-step3f-f3c.md`，包含 VS Code、No Fault、B 第五筆 Data Replace、A Delay 3、GTKWave。F2b NOT_MET／full_F2_acceptance_complete=false 保留；既有 In-Flight 不可達情境不改標。真 CoreRTL 植錯、雙核心／Uncore、CPU Performance／Recovery Pending。本輪完成後停止，不進入 F3d。
+
+## Step 3G-1：Real Uncore Gate 與 Dual-Core Wrapper（2026-11-25）
+
+- 基準 `ahb-lockstep-step3`／`be73f8e8d`；保留個人 config.ini、手動 fault_config.ini、未追蹤舊 RTL／備份及所有歷史 Artifacts，未 Commit／Push。
+- 新增 `wallylockstepsoc.sv`：真正 core／core_b、原完整 Guard、唯一原始 uncoregen.uncore。同 P／Clock／Reset／Interrupt／MTIME／ExternalStall；A/B HREADY／Response 分開，Clock Outputs 沒有短接。原始 Pipeline／Cache／EBU／Controller／Uncore／rv64gc／BURST_EN 均未修改。
+- UNCORE_GATE_PASS：Synthetic A/B 驅動真正 Guard＋真正 Uncore，61 Pair／MATCH／Auth／Accept／DataComplete／AComplete／BComplete，2 Epoch；6個INCR8／48 Beats＋13 SINGLE，RAM Read／Write／Byte Lane／Reset保留資料與APB UART均PASS。
+- 物理 RAM Write Effects=33、UART THR接收0x47恰一次、未授權或重複Write=0；BUSY297 Cycles、實際APB Data Stall1、Address Stall0。非零Address Stall與更廣WaitPattern未覆蓋，不製造假HREADY。UART是APB／THR接收驗證，不假稱Serial Frame解碼。
+- WRAPPER_BUILD_PASS：Lint／JSON Elaboration／逐Port Check／原Makefile完整Build PASS；AST證明兩顆原始Core同參數、A/B各自接Guard、Guard接唯一Uncore。Wrapper Binary沒有執行，REAL_DUAL_CORE_HELLO_PENDING。
+- Single-Core Baseline：原 testbench／wallypipelinedsoc Build與Hello Simulation PASS，使用相同Frozen ELF與載入檔，UART內容正確；沒有更動原wsim行為。
+- 新增 Gate／Build Harness／DPI Helper／Runner／FST Replay；Source Manifest只列正式追蹤RTL加新Wrapper，排除未追蹤ahb_guard.sv與舊SoC備份，不刪除舊資料。
+- Problems & Solutions：補原Memory getenvval DPI Link；處理UART字元黏接Marker；修正新Wrapper Port宣告筆誤；用JSON取代Deprecated XML，無Warning Suppression。F3c驗收原先依賴使用者目前Delay設定而把Data Case跑成Delay，改驗收Driver明確設定完整基準，保持248案例標準與手動INI不變；原失敗證據全保留。
+- Regression：F1 103、F2三寬度各37、F3a 1008 Mismatch／21 Reset、F3b 432 ERROR／18 Reset、3B～3E、Controller25 cases／148、EBU27 cases／236均PASS；F3c修正後248/248符合預期。最終零新增Build Warning／Error，Ruff py39／py313與Diff Check PASS。
+- 證據Root `artifacts/ahb-lockstep-step3g/3g1-run-006/`；Gate FST／原始CSV與Memory、verification-002逐A/B／Owner／RAM／UART Replay、Connection Check／Wrapper Build、Single UART／Logs／Inputs SHA256完整保留。Regression見同層regression-run-001與002。命令與限制見 `docs/ahb-dual-core-step3g-1.md`。
+- 下一步才做3G-2 DUT選擇、B Retirement／Termination／Cache觀察與真正雙Core Hello。F2b NOT_MET／full_F2_acceptance_complete=false不變；真CPU Performance／Bus Error Trap／Recovery Pending。本輪完成後停止。

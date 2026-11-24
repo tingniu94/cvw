@@ -26,7 +26,15 @@ def main():
     scenarios = []
 
     def add(name, changes=None, expected='PASS', reason=None, transform=None):
-        settings = {'CONFIGURATION': 'rv64', **(changes or {})}
+        # Test intent must not depend on the user's last manual INI selection.
+        settings = {'CONFIGURATION': 'rv64', 'WORKLOAD': 'write_incr8', 'SAVE_WAVEFORM': 'true',
+                    'BASE_DELAY_A': 0, 'BASE_DELAY_B': 0, 'DOWNSTREAM_WAIT_CYCLES': 2, 'WATCHDOG_CYCLES': 2000,
+                    'FAULT_ENABLE': 'true', 'FAULT_TARGET': 'B', 'FAULT_LOCATION': 'Ingress', 'FAULT_TYPE': 'Data',
+                    'DATA_MODE': 'replace', 'DATA_VALUE': '0x12345678', 'FAULT_BIT': 3, 'XOR_MASK': '0x8',
+                    'ADDRESS_MODE': 'bit_flip', 'ADDRESS_BIT': 3, 'ADDRESS_VALUE': '0x80001000', 'ADDRESS_XOR_MASK': '0x8',
+                    'CONTROL_SIGNAL': 'HSIZE', 'CONTROL_VALUE': '0x1', 'DELAY_CYCLES': 3,
+                    'TRIGGER_MODE': 'transaction', 'INJECT_AT_TRANSACTION': 5, 'INJECT_AT_CYCLE': 'none', 'INJECT_AT_BEAT': 5,
+                    **(changes or {})}
         text = template
         for key, value in settings.items():
             text, count = re.subn(r'^' + key + r' = .*$', key + ' = ' + str(value), text, flags=re.MULTILINE)
