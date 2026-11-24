@@ -84,7 +84,12 @@ module ahb_lockstep_output #(
   assign address_phase=HRESETn&&(state==ADDRESS);
   assign data_phase=HRESETn&&(state==DATA);
   assign response_pending=HRESETn&&(state==RESPONSE);
-  assign M_HTRANS=!HRESETn ? 2'b00 : address_phase ? owner_trans : busy_gap ? 2'b01 : 2'b00;
+  // After sampling ERROR cycle 1 (HRESP=1,HREADY=0), cancel the
+  // remaining burst in cycle 2. Keep the old data owner/control intact;
+  // error_seen stays set through response release/HALTED until common reset.
+  // AHB-Lite permits this HTRANS change despite the preceding ERROR stall.
+  assign M_HTRANS=!HRESETn ? 2'b00 : address_phase ? owner_trans :
+                  error_seen ? 2'b00 : busy_gap ? 2'b01 : 2'b00;
   assign M_HADDR=busy_gap ? expected_addr : owner_addr;
   // This is the NEXT (IDLE) address direction during the old write data phase.
   assign M_HWRITE=ENABLE_INCR8 ? owner_write : address_phase&&owner_write;

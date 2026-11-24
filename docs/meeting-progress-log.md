@@ -277,3 +277,33 @@ Unit數據：總Edge距離2655、Address Stall423、Data Stall530、BUSY1470、P
 Problems & Solutions：run-001新TB IFUReqDelay階層誤寫，修正為ebufsmarb層；run-002一個WIDTHEXPAND以Operand擴寬修正；run-003 ccache sandbox Read-only改獲准外部Build。run-004 26cases/228首次Sim PASS後補明確Memory Readback，run-005 27cases/236全部PASS；未以改條件掩蓋功能失敗、無Guard/原EBU修正。所有舊Run保留，無Warning Suppression。
 
 新增ebu_gate_tb/run_ebu_gate/summarize_ebu_gate/analyze_ebu_arbitration/render_ebu_gate及docs/ahb-dual-core-step3f-ebu-gate.md；沒有修改Controller Gate原測試。Evidence在ebu-gate-run-005，含Logs/Commands、Events/Arbitration/Owner/Ack/Fetch Ledgers、Memory Dumps、FST、GTKWave、三張真實FST PNG（非GUI截圖）、Hash/Diff、Codex完整回覆與ZIP。Meeting可報告：原EBU仲裁與已測No-Fault序列化Guard相容，可安排F3，仍無真Cache/CPU/Uncore/雙Core/中途Fault/Reset驗證。本輪停止，不進F3/3G/Fault Injection；未Commit/Push。
+
+
+## Step 3F F3a：Mismatch／Fail-Closed／共同 Reset（2026-11-24）
+
+- 基準：`ahb-lockstep-step3`／`0a6d7cbf0`；未修改 Guard 或原始 CPU／Cache／EBU／Controller／BURST_EN，未 Commit／Push。
+- 新增 `f3a_mismatch_tb.sv`、`f3a_output_tb.sv`、`run_f3a.py`；技術說明見 `docs/ahb-dual-core-step3f-f3a.md`。
+- Full Guard：三寬度各 336 Mismatch（8 個 Beat 位置、Read／Write 有效欄位、A Early／B Early／同步），合計 1008 PASS；正常 Read 不比對 Write Data／Strobe，三組各一完整 Burst PASS。
+- 每寬度 7 個共同 Reset PASS；RAM 不清空，Reset 後以新 Sequence 執行合法 INCR8 Read／Write。每寬度 Auth 1317、Accepted 1316、Data Completed 1313、A/B Completed 各 1311；差異明確對應 1 Address／3 Data／2 Response Reset Cancellation，非交易遺失。
+- 每寬度 745 個合法 Write Effects；Mismatch 後新增 Write Effects／RAM Byte Changes／Authorization／Acceptance／假成功 Response 皆 0。第 5 Beat 植錯共 72 個 Write 案例，各保留前四筆合法 Write，後續沒有 Side Effect；沒有 Rollback 宣稱。
+- Module-Level：6 種公開 inhibit 測試 PASS，共 12 個舊授權 Owner 完成。單 Slot 限制使完整 Guard 的「舊交易 In-Flight 時下一筆 Comparator Mismatch」為 NOT_REACHABLE_IN_CURRENT_ARCHITECTURE，沒有偽造 Full Guard PASS。
+- Problems & Solutions：run-001 ccache 沙箱唯讀失敗；run-002 TB 太早要求兩級 Fault 同時鎖存，改以第一拍 Validator、後續 Output Fault 檢查，RTL 不變；run-003 為迭代資料、不作最終 Source Provenance；run-004 加入 Source Snapshot 結束時一致性檢查；run-005 補齊實際 Stall 後 Reset，作為最終證據。原始 Log 全部保留。
+- Regression：F1 103 PASS；F2 三寬度各 37 transactions PASS；3B～3E PASS；Controller Gate 25 cases／148 transactions PASS；EBU Gate 27 cases／236 transactions PASS。最終 Lint／Build 及 Regression 0 Warning／0 Error；Ruff py39／py313、Whitespace Check PASS。
+- 重現：`python3 tests/ahb_lockstep/run_f3a.py NEW_OUTPUT_DIRECTORY`；完整 Build／Lint／Simulation argv 與 cwd 存於各 `*-command.json`。Regression 指令見技術文件及各 Root Command JSON。
+- 證據：`artifacts/ahb-lockstep-step3f/f3a-run-005/`，含 Fault CSV／JSON、逐 Owner Ledger、Memory Before／After、FST、Source SHA256／Snapshot、Summary／Git Diff；Regression 在 `f3a-regression-run-001/`。
+- Meeting 重點：現有序列化架構無須 RTL 修補即可通過本輪 Mismatch／Fail-Closed／共同 Reset 測試；測試已分開驗證授權前新交易與已接受舊 Owner 的責任。
+- 限制與待辦：F2b 維持 NOT_MET／full_F2_acceptance_complete=false；F3b ERROR／Fault Drain、真實 SoC Reset Coordinator、真雙核心／Shared Uncore、CPU Performance 都 Pending。本輪完成後停止。
+
+## Step 3F F3b：AHB HRESP ERROR Handling（2026-11-24）
+
+- 基準 `ahb-lockstep-step3`／`0a6d7cbf0`；保留未提交 F3a 與全部舊證據。新增 F3b TB／Runner／技術文件，僅局部修改 `ahb_lockstep_output.sv` 的 M_HTRANS 選擇。
+- Bug／Root Cause：原始 `busy_gap` 未考慮 error_seen，中途 ERROR 後仍 BUSY，與取消並 HALTED 的政策不一致。run-002 原始 Log／FST 重現；修正為第一 ERROR Edge 鎖存 error_seen 後，在第二 ERROR Cycle 起輸出 IDLE，Owner／Address／Data／Response 不變。
+- Verilator run-001 Internal Fault 已定位階層式 Enum 參照，僅改 TB 的 HALTED 狀態觀察，未停用 Assertion；原始診斷完整保留。Ruff RUF002 改 ASCII 冒號，無 Suppression。
+- F3b Full Guard：三寬度各 144 ERROR cases／6 Reset cases PASS，合計 432／18。涵蓋 INCR8 Beat 1～8、Read／Write、A/B 三種 Skew、零 Wait／多 Wait／Address Stall、A/B 兩 Cycle ERROR 與 HALTED。
+- 每寬度 Authorized=Accepted=768、Data Completed=766、A/B Completed 各 763；差額為兩個未完成 Data、三個未釋放 Response 被共同 Reset 取消，逐 Owner 可追蹤。
+- 每寬度合法 Write Effects=441，其中 OKAY=393、已授權 ERROR Commit=48；Fault 後新 Write Side Effect／Authorization／Acceptance／假成功 Response=0。不提交 ERROR 模型 RAM 不變，已完成 Prefix Writes 保留。不是 Rollback。
+- Reset 涵蓋 ERROR1 取樣前／後、下游完成後 RESPONSE、上游 ERROR_1／ERROR_2、HALTED；同時清 Guard／Source／Slave Protocol，RAM 保留，Reset 後合法 INCR8 Read／Write PASS。
+- Regression：F1 103、F2 三寬度各 37、F3a 1008 Mismatch／21 Reset／6 Module-Level、3B～3E、Controller 25 cases／148 transactions、EBU 27 cases／236 transactions 全 PASS；最終 0 Warning／0 Error，Ruff py39／py313 與 Whitespace Check PASS。
+- 實際重現命令：`python3 tests/ahb_lockstep/run_f3b.py NEW_OUTPUT_DIRECTORY`；完整 argv／cwd 在各 Command JSON。證據 Root `artifacts/ahb-lockstep-step3f/f3b-run-003/`；Regression `f3b-regression-run-001/`；設計／時序／Memory 契約見 `docs/ahb-dual-core-step3f-f3b.md`。
+- Meeting 重點：Guard 能辨識並保存 ERROR Owner，延後且同步回送 A/B 兩 Cycle ERROR；中途 Burst 合法取消後 Fail-Closed，沒有將 ERROR Write 誤當必然零 Side Effect。
+- 限制：EBU HRESP 仍 Presently ignored，CPU Trap／Recovery／真雙核心／Shared Uncore／SoC Reset Coordinator／CPU Performance Pending。F2b NOT_MET／full_F2_acceptance_complete=false 不變；In-Flight 新 Mismatch 的完整 Guard 情境仍不可達。未 Commit／Push，完成後停止，不進入 F3c。
