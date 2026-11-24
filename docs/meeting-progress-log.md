@@ -307,3 +307,17 @@ Problems & Solutions：run-001新TB IFUReqDelay階層誤寫，修正為ebufsmarb
 - 實際重現命令：`python3 tests/ahb_lockstep/run_f3b.py NEW_OUTPUT_DIRECTORY`；完整 argv／cwd 在各 Command JSON。證據 Root `artifacts/ahb-lockstep-step3f/f3b-run-003/`；Regression `f3b-regression-run-001/`；設計／時序／Memory 契約見 `docs/ahb-dual-core-step3f-f3b.md`。
 - Meeting 重點：Guard 能辨識並保存 ERROR Owner，延後且同步回送 A/B 兩 Cycle ERROR；中途 Burst 合法取消後 Fail-Closed，沒有將 ERROR Write 誤當必然零 Side Effect。
 - 限制：EBU HRESP 仍 Presently ignored，CPU Trap／Recovery／真雙核心／Shared Uncore／SoC Reset Coordinator／CPU Performance Pending。F2b NOT_MET／full_F2_acceptance_complete=false 不變；In-Flight 新 Mismatch 的完整 Guard 情境仍不可達。未 Commit／Push，完成後停止，不進入 F3c。
+
+
+## Step 3F F3c：Manual Fault Injection Tool（2026-11-24）
+
+- 基準 `ahb-lockstep-step3`／`430ef960d`。新增完整英文註解 INI、F3c TB／Runner／驗收 Driver、繁體中文操作文件；未修改 Guard／CPU／Cache／EBU／Configuration。未 Commit／Push。
+- 使用者修改 `tests/ahb_lockstep/fault_config.ini`，執行 `python3 tests/ahb_lockstep/run_f3c.py --config tests/ahb_lockstep/fault_config.ini`；標準函式庫 configparser 嚴格驗證，不用 eval 或額外設定檔套件。
+- 支援 A/B Data Bit Flip／Replace／XOR、Address 三種模式、七個 Control Signal、Delay。Transaction 共用 1-based 邏輯序號；Cycle 為 Reset Release 後 0-based 的安全 Address 提出時機；Actual Data Capture Cycle 另記錄。未命中不延後套用。
+- 明確分開 Requested／Applied／Detected／Fail-Closed；同值／零 XOR 為 NO_EFFECT；Delay=0 為零 Delay 參考，不假稱 Applied；Read Write-Lane Fault 拒絕；HTRANS=IDLE／首筆 BUSY 不支援，中途 BUSY 不建立 Request，回報 NOT_INJECTED。
+- 最終矩陣 248/248 符合預期：208 正向執行成功、40 負向維持預期非零 Exit Code。標準 Data 54、Address 54、Control 42、Delay 24、No Fault 29；另有有效 Cycle Trigger／忽略欄位檢查。26 Invalid Config、6 NO_EFFECT、6 NOT_INJECTED、1 動態 Trigger Conflict、1 Watchdog FAIL 均未冒充工具 PASS。
+- 額外最高位元／完整寬度 Replace 8/8 PASS，涵蓋 Data 63/31、Address 55/33/31、64/32-bit。所有已偵測 Mismatch 的 Reason 正確、Fail-Closed、未授權 Write Side Effect=0；上／下游 Stall Stability Assertions 與 A/B Response Assertions 保持啟用。
+- Problems & Solutions：首次三個 WIDTHEXPAND 用有界 32-bit 中間運算修正；Reset Deassert 同一 Delta 讀 HREADY 過早，加入收斂等待；Runner 初版誤把 Validator reason[7] 的 Comparator Fault 傳遞視為 Policy Reject，修正分類。原始 f3c-run-001～003 與失敗 Build Logs 保留，沒有改 Guard 或壓 Warning。
+- Regression 全 PASS：F1 103、F2 三寬度各 37、F3a 1008 Mismatch／21 Reset、F3b 432 ERROR／18 Reset、3B～3E、Controller 25 cases／148 transactions、EBU 27 cases／236 transactions。最終 Lint／Build 無 Warning，Ruff py39／py313、Assertions／Diff Check PASS；刻意 Watchdog 的 Fatal 獨立標為預期負向。
+- 證據：`artifacts/ahb-lockstep-step3f/f3c-validation-run-002/`、`f3c-boundary-validation-run-001/`、`f3c-regression-run-001/`；各案例包含 INI、Parsed Config、Injection／Owner／Source／Memory Ledgers、Summary／Log／FST，Binary Cache 以 Source／Tool／Width Hash 驗證。
+- 操作與範例見 `docs/ahb-dual-core-step3f-f3c.md`，包含 VS Code、No Fault、B 第五筆 Data Replace、A Delay 3、GTKWave。F2b NOT_MET／full_F2_acceptance_complete=false 保留；既有 In-Flight 不可達情境不改標。真 CoreRTL 植錯、雙核心／Uncore、CPU Performance／Recovery Pending。本輪完成後停止，不進入 F3d。
