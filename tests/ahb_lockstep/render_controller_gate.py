@@ -56,7 +56,8 @@ def render(name,start,end,markers,title):
         pts=[(start,before[-1][1] if before else '0')]+[(t,v) for t,v in signals[sig] if start<t<end]
         pts.append((end,pts[-1][1]))
         last_y=None
-        for (a,v),(b,_) in zip(pts,pts[1:]):
+        for idx in range(len(pts)-1):
+            (a,v),(b,_) = pts[idx],pts[idx+1]
             if widths[sig]==1:
                 yy=y+(3 if v=='1' else 30)
                 segment(x(a),yy,x(b),yy)

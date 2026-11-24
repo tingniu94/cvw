@@ -70,7 +70,7 @@ def main(run):
     # Check numerical agreement for every exported metric, retaining all differences.
     rows=[]
     for key,value in metrics['original'].items():
-        if not isinstance(value,(int,float)):
+        if not (isinstance(value,int) or isinstance(value,float)):
             continue
         step=metrics['step2'][key]
         delta=step-value
