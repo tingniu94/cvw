@@ -290,7 +290,9 @@ module testbench;
       $finish;
     end
     if (MAKE_VCD) begin
-`ifdef CVW_DUAL_CORE
+`ifdef CVW_CPU_PERFORMANCE
+      $dumpfile("performance.fst");
+`elsif CVW_DUAL_CORE
       $dumpfile("dualcore.fst");
 `else
       $dumpfile("testbench.vcd");
@@ -817,7 +819,9 @@ module testbench;
   // PCM is not valid for configurations without ZICSR or branch predictor
   flopenr #(P.XLEN) PCMReg(clk, reset, ~dut.core.StallM, dut.core.PCE, PCM);
   always @(posedge clk) begin
-`ifdef CVW_DUAL_CORE
+`ifdef CVW_CPU_PERFORMANCE
+    TestComplete <= g3_finished;
+`elsif CVW_DUAL_CORE
     TestComplete <= dual_done[0] && dual_done[1] && dual_reported;
 `else
     TestComplete <= ((InstrM == 32'h6f) & dut.core.InstrValidM ) |
@@ -834,6 +838,10 @@ module testbench;
 
 `ifdef CVW_DUAL_CORE
   `include "common/dualcore_monitor.svh"
+`endif
+
+`ifdef CVW_CPU_PERFORMANCE
+  `include "common/cpu_performance.svh"
 `endif
 
   DCacheFlushFSM #(P) DCacheFlushFSM(.clk, .start(DCacheFlushStart), .done(DCacheFlushDone));

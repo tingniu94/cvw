@@ -345,3 +345,16 @@ Problems & Solutions：run-001新TB IFUReqDelay階層誤寫，修正為ebufsmarb
 - 本輪 F1/F2/F3a/F3b/F3c/3B～3E/Controller/EBU/Real Uncore/Single 全部重跑 PASS，見 `artifacts/ahb-lockstep-step3g/3g2-regression-run-001/results.json`。Dual Build/Lint 零 Warning/Error，Assertions、Ruff py39/313、Diff Check PASS。
 - BUSY 1,260、Data Wait 705 為觀察值，不是 CPU Overhead Benchmark。F2b NOT_MET、full_F2_acceptance_complete=false 保留；CPU Bus Error Trap、Recovery、完整效能比較 Pending。
 - 技術文件：`docs/ahb-dual-core-step3g-2.md`。證據：`artifacts/ahb-lockstep-step3g/3g2-run-002/`，逐 Owner Ledger 在 verification。保留個人 config.ini、手動 INI、Artifacts、Backups 與舊未追蹤 RTL；沒有 Commit/Push，停止於 3G-2。
+
+## 2026-11-25：Step 3G-3 Real CPU Performance Measurement
+
+- 基準 `605adc4e6`；只新增被動 Performance Trace、Runner/Replayer、TB Compile-Time Completion 選項，未修改功能 RTL、CPU/Cache/EBU/Uncore/rv64gc/Hello。既有 Single/Dual Flow 預設不變。
+- 使用同一 Frozen Hello ELF/Memfile/Labels/Address、Configuration、Clock/Reset、Verilator/Assertions/FST。舊 `reset_release_to_tb_complete_v1` 保留並獨立核對；新共同 `reset_release_to_retired_tohost_and_drained_v1` 明確包含成功退休的 tohost Store，排空後下一 Edge 不計入。
+- `3g3-run-001` Build 因 sandbox ccache Read-only 失敗，原證據保留；獲准後於 `3g3-run-002` 使用相同命令重跑。兩組新 Performance Simulation PASS，未放寬檢查。
+- 共同 ROI：Single 11588 Cycles/5761 Retirement/CPI 2.011456344；Dual System 12768 Cycles，A/B各4117 Retirement/CPI 3.101287345、Completion Skew=0。mcycle/minstret沒有Inhibit/Write，逐Edge Crosscheck Mismatch=0。
+- Cycle Overhead +10.182948%；CPI +54.181191%，但Single多548次UART輪詢，恰好多1644次Retirement，只在三個UART Poll Loop PC有差異，不能把CPI變化當純Comparator成本。
+- Pipeline Stall Union 5500→8310（47.463%→65.085%）。Guard Peer Wait=0、Pair/Result Backpressure=0；各側Pending Response Wait=5707、BUSY=1260、下游Data Wait=705，Wait Union=5959，不能直接相加。
+- Single AHB Avg 1.813108371；Dual A/B 6.747230614；Dual Downstream 1.709969789。36個完整Read INCR8，Burst Latency為Single8、Dual上游48、Dual下游43；真實CPU Write Burst效能本次無樣本，Pending。
+- UART同一份36 Bytes；AHB全部Owner完成無Pending；No-Fault、Assertions、Counter/ROI/Latency驗收全PASS。11組Regression重跑全PASS，Ruff py39/py313與Diff Check PASS。RUF007採Python3.9相容Index Traversal修正，不停用規則。
+- 結果：`artifacts/ahb-lockstep-step3g/3g3-run-002/`，最終Replayer為`analysis-003`；Regression：`3g3-regression-run-001/`；文件：`docs/ahb-dual-core-step3g-3.md`。
+- F2b NOT_MET、full_F2_acceptance_complete=false；原EBU HRESP Trap/Recovery、其他Workload Benchmark及真正CPU Fault Injection仍Pending。未進入下一階段，未Commit/Push，個人config.ini、手動INI及所有舊資料均保留。
