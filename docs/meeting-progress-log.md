@@ -335,3 +335,13 @@ Problems & Solutions：run-001新TB IFUReqDelay階層誤寫，修正為ebufsmarb
 - Regression：F1 103、F2三寬度各37、F3a 1008 Mismatch／21 Reset、F3b 432 ERROR／18 Reset、3B～3E、Controller25 cases／148、EBU27 cases／236均PASS；F3c修正後248/248符合預期。最終零新增Build Warning／Error，Ruff py39／py313與Diff Check PASS。
 - 證據Root `artifacts/ahb-lockstep-step3g/3g1-run-006/`；Gate FST／原始CSV與Memory、verification-002逐A/B／Owner／RAM／UART Replay、Connection Check／Wrapper Build、Single UART／Logs／Inputs SHA256完整保留。Regression見同層regression-run-001與002。命令與限制見 `docs/ahb-dual-core-step3g-1.md`。
 - 下一步才做3G-2 DUT選擇、B Retirement／Termination／Cache觀察與真正雙Core Hello。F2b NOT_MET／full_F2_acceptance_complete=false不變；真CPU Performance／Bus Error Trap／Recovery Pending。本輪完成後停止。
+
+## 2026-11-25：Step 3G-2 真正 Dual-Core Hello Wally
+
+- 沿用已通過 3G-1 的真正雙 Core Wrapper，新增 TB Compile-Time 選擇、雙側 Retirement/tohost Monitor、Runner 與 CSV Owner Replay；沒有修改功能 RTL 或 rv64gc/BURST_EN。
+- `3g2-run-001` 首次失敗為新增 Monitor 使用 Function Label Map 查不到 Data Symbol tohost，Watchdog 觸發；保留失敗 FST/Log。只以凍結 ELF 的 nm Symbol 修正監看位址，未放寬成功條件。
+- `3g2-run-002` 五項 Dual 驗收 PASS：A/B 各退休 4,117、200 Fetch Beats、25 ICache Ack；993 Owner 的 Pair/MATCH/Authorization/Acceptance/Completion/雙側 Response 全數逐筆守恆；兩側退休成功 tohost Store 後正常結束。
+- UART 37 Register Writes、36 Character Bytes，與本輪 Single-Core 逐 Byte 一致，沒有重複或未授權 UART Write；本次外部 RAM Write 為 0，不擴大宣稱 Writeback Coverage。
+- 本輪 F1/F2/F3a/F3b/F3c/3B～3E/Controller/EBU/Real Uncore/Single 全部重跑 PASS，見 `artifacts/ahb-lockstep-step3g/3g2-regression-run-001/results.json`。Dual Build/Lint 零 Warning/Error，Assertions、Ruff py39/313、Diff Check PASS。
+- BUSY 1,260、Data Wait 705 為觀察值，不是 CPU Overhead Benchmark。F2b NOT_MET、full_F2_acceptance_complete=false 保留；CPU Bus Error Trap、Recovery、完整效能比較 Pending。
+- 技術文件：`docs/ahb-dual-core-step3g-2.md`。證據：`artifacts/ahb-lockstep-step3g/3g2-run-002/`，逐 Owner Ledger 在 verification。保留個人 config.ini、手動 INI、Artifacts、Backups 與舊未追蹤 RTL；沒有 Commit/Push，停止於 3G-2。

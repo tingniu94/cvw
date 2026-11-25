@@ -290,7 +290,11 @@ module testbench;
       $finish;
     end
     if (MAKE_VCD) begin
+`ifdef CVW_DUAL_CORE
+      $dumpfile("dualcore.fst");
+`else
       $dumpfile("testbench.vcd");
+`endif
       $dumpvars;
     end
   end // initial begin
@@ -684,7 +688,21 @@ module testbench;
 
   end
 
-  wallypipelinedsoc  #(P) dut(.clk, .reset_ext, .reset, .ExternalStall(RVVIStall),
+`ifdef CVW_DUAL_CORE
+  logic dual_fault;
+  logic [10:0] dual_compare_reason;
+  logic [2:0] dual_gate_reason;
+  logic [31:0] dual_owner;
+  logic dual_auth, dual_accept, dual_complete;
+  logic [63:0] dual_peer, dual_a_peer, dual_b_peer, dual_backpressure, dual_pairs;
+  wallylockstepsoc #(P) dut(
+    .fault_valid(dual_fault),.compare_fault_reason(dual_compare_reason),.gate_fault(dual_gate_reason),
+    .owner_seq(dual_owner),.authorized_dispatch(dual_auth),.down_accept(dual_accept),.down_complete(dual_complete),
+    .pairing_wait_cycles(dual_peer),.a_peer_wait_cycles(dual_a_peer),.b_peer_wait_cycles(dual_b_peer),
+    .pair_backpressure_cycles(dual_backpressure),.paired_requests(dual_pairs),
+`else
+  wallypipelinedsoc #(P) dut(
+`endif.clk, .reset_ext, .reset, .ExternalStall(RVVIStall),
     .HRDATAEXT, .HREADYEXT, .HRESPEXT, .HSELEXT,
     .HCLK, .HRESETn, .HADDR, .HWDATA, .HWSTRB, .HWRITE, .HSIZE, .HBURST, .HPROT,
     .HTRANS, .HMASTLOCK, .HREADY, .TIMECLK(1'b0), .GPIOIN, .GPIOOUT, .GPIOEN,
@@ -799,9 +817,13 @@ module testbench;
   // PCM is not valid for configurations without ZICSR or branch predictor
   flopenr #(P.XLEN) PCMReg(clk, reset, ~dut.core.StallM, dut.core.PCE, PCM);
   always @(posedge clk) begin
+`ifdef CVW_DUAL_CORE
+    TestComplete <= dual_done[0] && dual_done[1] && dual_reported;
+`else
     TestComplete <= ((InstrM == 32'h6f) & dut.core.InstrValidM ) |
        ((dut.core.lsu.IEUAdrM == ProgramAddrLabelArray["tohost"] & dut.core.lsu.IEUAdrM != 0) & InstrMName == "SW"); // |
     //   (functionName.PCM == 0 & dut.core.ifu.InstrM == 0 & dut.core.InstrValidM & PrevPCZero));
+`endif
     if (reset) PrevPCZero <= 0;
     else if (dut.core.InstrValidM) PrevPCZero <= (PCM == 0 & dut.core.ifu.InstrM == 0);
     if (PCM == 0 & dut.core.ifu.InstrM == 0 & dut.core.InstrValidM & PrevPCZero) begin
@@ -809,6 +831,10 @@ module testbench;
       $fatal(1);
     end
   end
+
+`ifdef CVW_DUAL_CORE
+  `include "common/dualcore_monitor.svh"
+`endif
 
   DCacheFlushFSM #(P) DCacheFlushFSM(.clk, .start(DCacheFlushStart), .done(DCacheFlushDone));
 
